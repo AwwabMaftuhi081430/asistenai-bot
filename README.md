@@ -21,8 +21,8 @@ Bot Telegram multifungsi untuk mahasiswa Indonesia. Bantu catat **keuangan**, **
 
 - **Runtime:** Node.js 20 LTS
 - **Bot Framework:** Telegraf v4
-- **Database:** MySQL (Aiven / Laragon)
-- **AI:** Google Gemini 1.5 Flash
+- **Database:** Supabase (PostgreSQL)
+- **AI:** Groq Cloud (Llama 3.3 70B)
 - **Scheduler:** node-cron
 - **Hosting:** Render.com (free tier)
 
@@ -33,7 +33,7 @@ Bot Telegram multifungsi untuk mahasiswa Indonesia. Bantu catat **keuangan**, **
 ### 1. Prasyarat
 
 - [Node.js](https://nodejs.org/) v18+
-- Database MySQL (Aiven / Laragon)
+- Akun [Supabase](https://supabase.com) (free tier)
 - API Key [Google AI Studio](https://aistudio.google.com)
 - Token bot dari [@BotFather](https://t.me/BotFather) di Telegram
 
@@ -45,9 +45,14 @@ cd telegram-bot
 npm install
 ```
 
-### 3. Setup Database
+### 3. Setup Database (Supabase)
 
-Jalankan `sql/migration_mysql.sql` di MySQL client (HeidiSQL, phpMyAdmin, dll).
+1. Buat project di [Supabase](https://supabase.com)
+2. Buka **SQL Editor** → paste dan jalankan isi `sql/migration.sql`
+3. Dapatkan credential dari **Project Settings → Database**:
+   - `SUPABASE_URL` — dari **API Settings** → Project URL
+   - `SUPABASE_SERVICE_KEY` — dari **API Settings** → `service_role` key
+   - `DATABASE_URL` — dari **Connection string** → URI (ganti `[YOUR-PASSWORD]`)
 
 ### 4. Konfigurasi Environment
 
@@ -58,14 +63,12 @@ cp .env.example .env
 Isi `.env`:
 
 ```env
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=root
-DB_PASSWORD=
-DB_NAME=asistenai
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_KEY=eyJhbGciOi...
+DATABASE_URL=postgresql://postgres:password@db.xxxxx.supabase.co:5432/postgres
 
 BOT_TOKEN=7881234567:AAHxyz...          # dari @BotFather
-GEMINI_API_KEY=AIzaSy...                 # dari Google AI Studio
+GROQ_API_KEY=gsk_...                      # dari Groq Console
 PORT=3000
 NODE_ENV=production
 ```
@@ -82,17 +85,18 @@ npm run dev
 npm start
 ```
 
-### 6. Deploy ke Render.com + Aiven MySQL
+### 6. Deploy ke Render.com + Supabase
 
-1. Buat akun [Aiven](https://aiven.io) → pilih **Aiven for MySQL** (free tier)
-2. Catat **Host**, **Port**, **User**, **Password**, **Database Name** dari Aiven dashboard
-3. Push project ke GitHub
-4. Buat **Web Service** baru di [Render](https://render.com)
-5. Hubungkan repository kamu
-6. **Start Command:** `npm start`
-7. Tambahkan environment variable (lihat .env.example) — isi `DB_*` dengan data dari Aiven
-8. Pilih **Free** instance (512MB RAM)
-9. Deploy! 🎉
+1. Push project ke GitHub
+2. Buat **Web Service** baru di [Render](https://render.com)
+3. Hubungkan repository kamu
+4. **Start Command:** `npm start`
+5. Tambahkan environment variable:
+   - `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `DATABASE_URL`
+   - `BOT_TOKEN`, `GEMINI_API_KEY`
+   - `NODE_ENV=production`
+6. Pilih **Free** instance (512MB RAM)
+7. Deploy! 🎉
 
 ### 7. Keep Alive (anti-idle)
 
@@ -156,8 +160,9 @@ Render free tier akan meng-suspend instance yang idle. Cegah dengan [cron-job.or
 - Pastikan bot belum di-revoke dari @BotFather
 
 **Error database:**
-- Pastikan migrasi SQL sudah dijalankan
-- Cek koneksi Supabase di Dashboard
+- Pastikan migrasi SQL (`sql/migration.sql`) sudah dijalankan di Supabase SQL Editor
+- Cek koneksi Supabase di Dashboard → Database
+- Pastikan `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, dan `DATABASE_URL` sudah benar di environment
 
 **AI tidak menjawab:**
 - Validasi `GEMINI_API_KEY`

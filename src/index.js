@@ -239,11 +239,12 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 (async () => {
   try {
     await db.raw('SELECT 1 AS check_connection');
-    console.log('[DB] MySQL connected successfully');
+    console.log('[DB] Supabase connected successfully');
   } catch (err) {
     console.error('[DB] Connection error:', err.message);
   }
 
+  try {
     // Start notification engine
     initNotifEngine(bot);
 

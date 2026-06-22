@@ -37,7 +37,7 @@ async function checkReminders() {
   // 3. Belum dapat notif hari ini (anti-duplikat)
   try {
     const reminders = await db.raw(
-      `SELECT chat_id, \`${todayCol}\` FROM reminders WHERE is_active = true AND \`${todayCol}\` = ? AND (last_sent_at IS NULL OR last_sent_at != ?)`,
+      `SELECT chat_id, ${todayCol} FROM reminders WHERE is_active = true AND ${todayCol} = ? AND (last_sent_at IS NULL OR last_sent_at != ?)`,
       [currTime, today]
     );
 

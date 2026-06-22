@@ -60,7 +60,7 @@ async function handleAIChat(ctx, text) {
   } catch (err) {
     console.error('[AI] Chat error:', err.message);
 
-    if (err.message?.includes('API_KEY')) {
+    if (err.message?.includes('API_KEY') || err.message?.includes('401') || err.status === 401) {
       await ctx.reply(
         'Maaf, AI lagi offline karena masalah konfigurasi. Admin bakal diperbaiki segera~ 😅\n\nSementara ini, fitur bot lainnya (keuangan, tugas, absen, belajar) masih bisa dipakai kok!',
         mainKeyboard()

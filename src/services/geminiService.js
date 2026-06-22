@@ -1,10 +1,9 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const Groq = require('groq-sdk');
 const db = require('../config/database');
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-const SYSTEM_INSTRUCTION = `
-Kamu adalah asisten AI yang cerdas, supportif, dan relate buat mahasiswa Indonesia.
+const SYSTEM_PROMPT = `Kamu adalah asisten AI yang cerdas, supportif, dan relate buat mahasiswa Indonesia.
 Gaya bicara: kasual tapi informatif — seperti kakak kelas yang pintar.
 
 ATURAN WAJIB:
@@ -14,8 +13,7 @@ ATURAN WAJIB:
 - Kalau user stress/curhat: validasi perasaan dulu, baru beri saran
 - Sesekali boleh pakai istilah gaul yang relevan dan emoji
 - JANGAN jawab pertanyaan berbahaya, SARA, atau tidak etis
-- Kalau tidak tahu: jujur bilang tidak tahu, jangan mengarang
-`;
+- Kalau tidak tahu: jujur bilang tidak tahu, jangan mengarang`;
 
 async function chat(chatId, userMessage) {
   const history = await db.select('chat_history', {
@@ -26,19 +24,22 @@ async function chat(chatId, userMessage) {
     limit: 10,
   });
 
-  const formattedHistory = (history || []).reverse().map(h => ({
-    role: h.role,
-    parts: [{ text: h.content }],
-  }));
+  const messages = [
+    { role: 'system', content: SYSTEM_PROMPT },
+    ...(history || []).reverse().map(h => ({
+      role: h.role === 'model' ? 'assistant' : h.role,
+      content: h.content,
+    })),
+    { role: 'user', content: userMessage },
+  ];
 
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
-    systemInstruction: SYSTEM_INSTRUCTION,
+  const completion = await groq.chat.completions.create({
+    model: 'llama-3.3-70b-versatile',
+    messages,
+    max_tokens: 1024,
   });
 
-  const chatSession = model.startChat({ history: formattedHistory });
-  const result = await chatSession.sendMessage(userMessage);
-  const responseText = result.response.text();
+  const responseText = completion.choices[0]?.message?.content || '...';
 
   await db.insert('chat_history', { chat_id: chatId, role: 'user', content: userMessage });
   await db.insert('chat_history', { chat_id: chatId, role: 'model', content: responseText });
@@ -61,7 +62,7 @@ async function chat(chatId, userMessage) {
       }
     }
   } catch (err) {
-    console.error('[GEMINI] Trim error:', err.message);
+    console.error('[GROQ] Trim error:', err.message);
   }
 
   return responseText;
