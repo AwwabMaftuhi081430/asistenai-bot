@@ -1,6 +1,7 @@
 const express = require('express');
 const moment = require('moment-timezone');
-const { bot, startNotifEngine } = require('./bot');
+const { bot } = require('./bot');
+const { initNotifEngine } = require('./services/notifEngine');
 const db = require('./config/database');
 const { getActiveSessionsCount } = require('./services/sessionManager');
 
@@ -47,7 +48,7 @@ process.on('SIGINT', () => shutdown('SIGINT'));
     console.error('[DB] Connection error:', err.message);
   }
 
-  startNotifEngine();
+  initNotifEngine(bot);
 
   try {
     await bot.launch({
