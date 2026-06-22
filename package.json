@@ -1,0 +1,22 @@
+{
+  "name": "telegram-bot-assistant",
+  "version": "1.0.0",
+  "description": "Telegram Bot Assistant untuk mahasiswa Indonesia — tracker keuangan, tugas, absen, dan sesi belajar",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "dependencies": {
+    "telegraf": "^4.16.3",
+    "mysql2": "^3.9.7",
+    "@google/generative-ai": "^0.15.0",
+    "moment-timezone": "^0.5.45",
+    "node-cron": "^3.0.3",
+    "express": "^4.19.2",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.3"
+  }
+}
