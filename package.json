@@ -5,7 +5,11 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "nodemon src/index.js"
+    "dev": "nodemon src/index.js",
+    "vercel-build": "echo 'done'"
+  },
+  "engines": {
+    "node": "20.x"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",

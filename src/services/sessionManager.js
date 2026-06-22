@@ -38,7 +38,16 @@ function setSession(chatId, state, data = {}) {
 }
 
 function getSession(chatId) {
-  return sessions[chatId] || null;
+  const s = sessions[chatId];
+  if (!s) return null;
+
+  // Check expiry (handles serverless cold start where setTimeout didn't fire)
+  if (Date.now() - s.startedAt >= SESSION_TIMEOUT_MS) {
+    clearSession(chatId);
+    return null;
+  }
+
+  return s;
 }
 
 function clearSession(chatId) {

@@ -4,8 +4,12 @@ const db = require('../config/database');
 
 let bot = null;
 
-function initNotifEngine(botInstance) {
+function setBot(botInstance) {
   bot = botInstance;
+}
+
+function initNotifEngine(botInstance) {
+  setBot(botInstance);
 
   // Cron setiap 60 detik — cek reminders yang harus dikirim
   cron.schedule('* * * * *', async () => {
@@ -134,4 +138,4 @@ function stopAll() {
   console.log('[NOTIF] Cron jobs stopping at next cycle.');
 }
 
-module.exports = { initNotifEngine, stopAll };
+module.exports = { initNotifEngine, setBot, checkReminders, checkDeadlineTasks, stopAll };
