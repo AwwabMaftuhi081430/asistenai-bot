@@ -4,7 +4,7 @@ const { Pool } = require('pg');
 let supabase = null;
 let pgPool = null;
 
-function getSupabase() {
+function getSb() {
   if (!supabase) {
     const url = process.env.SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_KEY;
@@ -17,132 +17,100 @@ function getSupabase() {
 function getPool() {
   if (!pgPool) {
     const conn = process.env.DATABASE_URL;
-    if (!conn) throw new Error('DATABASE_URL is required for raw queries');
+    if (!conn) throw new Error('DATABASE_URL is required');
     pgPool = new Pool({
       connectionString: conn,
       ssl: { rejectUnauthorized: false },
+      connectionTimeoutMillis: 5000,
     });
   }
   return pgPool;
 }
 
-// Convert MySQL ? placeholders to PostgreSQL $1, $2, ...
-function convertParams(sql, params = []) {
-  let idx = 0;
-  const text = sql.replace(/\?/g, () => `$${++idx}`);
-  return { text, values: params };
-}
-
+// ── raw() via pg pool — only works where DNS resolves (local, Render)
 async function raw(sql, params = []) {
   const pool = getPool();
-  const { text, values } = convertParams(sql, params);
-  const result = await pool.query(text, values);
+  let idx = 0;
+  const text = sql.replace(/\?/g, () => `$${++idx}`);
+  const result = await pool.query(text, params);
   return result.rows;
 }
 
-async function select(table, { columns = '*', where = {}, orderBy, orderDir = 'ASC', limit, single = false } = {}) {
-  const sb = getSupabase();
-  let query = sb.from(table).select(columns);
+// ── select with filter array — uses Supabase REST API only
+async function find(table, { columns = '*', filters = [], orderBy, orderDir = 'ASC', limit, single = false } = {}) {
+  const sb = getSb();
+  let q = sb.from(table).select(columns);
 
-  for (const [key, value] of Object.entries(where)) {
-    if (value === null) {
-      query = query.is(key, null);
-    } else if (typeof value === 'object' && value !== null && value.operator) {
-      switch (value.operator) {
-        case '>':  query = query.gt(key, value.value); break;
-        case '<':  query = query.lt(key, value.value); break;
-        case '>=': query = query.gte(key, value.value); break;
-        case '<=': query = query.lte(key, value.value); break;
-        case '!=': query = query.neq(key, value.value); break;
-        case 'LIKE':  query = query.like(key, value.value); break;
-        case 'ILIKE': query = query.ilike(key, value.value); break;
-        default:
-          // fallback to raw query for unknown operators
-          return fallbackSelectRaw(table, columns, where, orderBy, orderDir, limit, single);
-      }
-    } else {
-      query = query.eq(key, value);
+  for (const f of filters) {
+    switch (f.op) {
+      case '=':  q = q.eq(f.key, f.val); break;
+      case '>':  q = q.gt(f.key, f.val); break;
+      case '<':  q = q.lt(f.key, f.val); break;
+      case '>=': q = q.gte(f.key, f.val); break;
+      case '<=': q = q.lte(f.key, f.val); break;
+      case '!=': q = q.neq(f.key, f.val); break;
+      case 'is': q = q.is(f.key, f.val); break;
+      case 'in': q = q.in(f.key, f.val); break;
+      case 'like':  q = q.like(f.key, f.val); break;
+      case 'ilike': q = q.ilike(f.key, f.val); break;
     }
   }
 
-  if (orderBy) {
-    query = query.order(orderBy, { ascending: orderDir === 'ASC' });
-  }
+  if (orderBy) q = q.order(orderBy, { ascending: orderDir === 'ASC' });
+  if (limit) q = q.limit(limit);
+  if (single && !limit) q = q.limit(1);
 
-  if (limit) query = query.limit(limit);
-
-  const { data, error } = await query;
+  const { data, error } = await q;
   if (error) throw error;
-
-  if (single) return data?.[0] || null;
-  return data || [];
+  return single ? (data?.[0] || null) : (data || []);
 }
 
-// Fallback: build raw SQL for complex where clauses Supabase JS client can't express
-async function fallbackSelectRaw(table, columns, where, orderBy, orderDir, limit, single) {
-  const clauses = [];
-  const params = [];
-
-  for (const [key, value] of Object.entries(where)) {
-    if (value === null) {
-      clauses.push(`"${key}" IS NULL`);
-    } else if (typeof value === 'object' && value !== null && value.operator) {
-      clauses.push(`"${key}" ${value.operator} $${params.length + 1}`);
-      params.push(value.value);
+// ── select via Supabase REST (simple where map, backward compat)
+async function select(table, { columns = '*', where = {}, orderBy, orderDir = 'ASC', limit, single = false } = {}) {
+  const filters = [];
+  for (const [key, val] of Object.entries(where)) {
+    if (val === null) {
+      filters.push({ key, op: 'is', val: null });
+    } else if (typeof val === 'object' && val !== null && val.operator) {
+      const opMap = { '>': '>', '<': '<', '>=': '>=', '<=': '<=', '!=': '!=', LIKE: 'like', ILIKE: 'ilike' };
+      filters.push({ key, op: opMap[val.operator] || '=', val: val.value });
     } else {
-      clauses.push(`"${key}" = $${params.length + 1}`);
-      params.push(value);
+      filters.push({ key, op: '=', val });
     }
   }
-
-  let sql = `SELECT ${columns} FROM "${table}"`;
-  if (clauses.length) sql += ' WHERE ' + clauses.join(' AND ');
-  if (orderBy) sql += ` ORDER BY "${orderBy}" ${orderDir}`;
-  if (limit) sql += ` LIMIT ${limit}`;
-  if (single && !limit) sql += ' LIMIT 1';
-
-  const pool = getPool();
-  const result = await pool.query(sql, params);
-  return single ? result.rows[0] || null : result.rows;
+  return find(table, { columns, filters, orderBy, orderDir, limit, single });
 }
 
 async function insert(table, data) {
-  const sb = getSupabase();
+  const sb = getSb();
   const { data: result, error } = await sb.from(table).insert(data).select();
   if (error) throw error;
   return result?.[0] || null;
 }
 
 async function update(table, data, where) {
-  const sb = getSupabase();
-  let query = sb.from(table).update(data);
-  for (const [key, value] of Object.entries(where)) {
-    query = query.eq(key, value);
-  }
-  const { data: result, error } = await query;
+  const sb = getSb();
+  let q = sb.from(table).update(data);
+  for (const [key, val] of Object.entries(where)) q = q.eq(key, val);
+  const { data: result, error } = await q;
   if (error) throw error;
   return result;
 }
 
 async function upsert(table, data, conflictKey) {
-  const sb = getSupabase();
-  const { data: result, error } = await sb
-    .from(table)
-    .upsert(data, { onConflict: conflictKey })
-    .select();
+  const sb = getSb();
+  const { data: result, error } = await sb.from(table).upsert(data, { onConflict: conflictKey }).select();
   if (error) throw error;
   return result;
 }
 
 async function remove(table, where) {
-  const sb = getSupabase();
-  let query = sb.from(table).delete();
-  for (const [key, value] of Object.entries(where)) {
-    query = query.eq(key, value);
-  }
-  const { data: result, error } = await query;
+  const sb = getSb();
+  let q = sb.from(table).delete();
+  for (const [key, val] of Object.entries(where)) q = q.eq(key, val);
+  const { data: result, error } = await q;
   if (error) throw error;
   return result;
 }
 
-module.exports = { raw, select, insert, update, upsert, delete: remove };
+module.exports = { raw, find, select, insert, update, upsert, delete: remove, getSb };

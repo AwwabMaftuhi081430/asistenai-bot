@@ -40,12 +40,16 @@ async function checkReminders() {
   // 2. Kolom hari ini = jam sekarang
   // 3. Belum dapat notif hari ini (anti-duplikat)
   try {
-    const reminders = await db.raw(
-      `SELECT chat_id, ${todayCol} FROM reminders WHERE is_active = true AND ${todayCol} = ? AND (last_sent_at IS NULL OR last_sent_at != ?)`,
-      [currTime, today]
-    );
+    const remindersData = await db.find('reminders', {
+      columns: `chat_id, ${todayCol}, last_sent_at`,
+      filters: [
+        { key: 'is_active', op: '=', val: true },
+        { key: todayCol, op: '=', val: currTime },
+      ],
+    });
 
-    for (const r of reminders ?? []) {
+    for (const r of (remindersData || [])) {
+      if (r.last_sent_at && r.last_sent_at === today) continue;
       await sendReminder(r.chat_id, currTime, today, todayCol);
     }
   } catch (err) {

@@ -1,24 +1,4 @@
-let bot = null;
-
-function getBot() {
-  if (bot) return bot;
-
-  const { Telegraf } = require('telegraf');
-  const token = process.env.BOT_TOKEN;
-
-  if (!token) {
-    throw new Error('BOT_TOKEN not set');
-  }
-
-  bot = new Telegraf(token, {
-    telegram: { webhookReply: true },
-  });
-
-  // Register handlers
-  require('../src/bot').registerHandlers(bot);
-
-  return bot;
-}
+const { bot } = require('../src/bot');
 
 module.exports = async function handler(req, res) {
   try {
@@ -27,11 +7,10 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const b = getBot();
-    await b.handleUpdate(req.body);
+    await bot.handleUpdate(req.body);
     res.status(200).send('OK');
   } catch (err) {
-    console.error('[WEBHOOK] Error:', err.message, err.stack);
+    console.error('[WEBHOOK] Error:', err.message);
     res.status(200).send('OK');
   }
 };

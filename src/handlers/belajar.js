@@ -197,10 +197,15 @@ async function endStudySession(ctx, chatId, session, isPause = false) {
     }, { id: sessionId });
 
     const weekStart = moment().tz('Asia/Jakarta').startOf('isoWeek').toISOString();
-    const weekLogs = await db.raw(
-      'SELECT duration_minutes FROM study_logs WHERE chat_id = ? AND is_active = false AND end_time >= ? AND duration_minutes IS NOT NULL',
-      [chatId, weekStart]
-    );
+    const weekLogs = await db.find('study_logs', {
+      columns: 'duration_minutes',
+      filters: [
+        { key: 'chat_id', op: '=', val: chatId },
+        { key: 'is_active', op: '=', val: false },
+        { key: 'end_time', op: '>=', val: weekStart },
+        { key: 'duration_minutes', op: 'is', val: 'not null' },
+      ],
+    });
 
     const totalMinutes = (weekLogs || []).reduce((sum, l) => sum + (l.duration_minutes || 0), 0);
 

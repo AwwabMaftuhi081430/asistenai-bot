@@ -57,8 +57,8 @@ async function chat(chatId, userMessage) {
     if (allIds && allIds.length > 20) {
       const idList = allIds.slice(20).map(r => r.id);
       if (idList.length > 0) {
-        const placeholders = idList.map(() => '?').join(',');
-        await db.raw(`DELETE FROM chat_history WHERE id IN (${placeholders})`, idList);
+        const sb = db.getSb();
+        await sb.from('chat_history').delete().in('id', idList);
       }
     }
   } catch (err) {

@@ -50,10 +50,16 @@ async function rekapCallbackHandler(ctx) {
   try {
     let message = `📊 *REKAP KEUANGAN — ${label}*\n\n`;
 
-    const finances = await db.raw(
-      'SELECT type, amount, note FROM finances WHERE chat_id = ? AND created_at >= ? AND created_at <= ? ORDER BY created_at ASC',
-      [chatId, startISO, endISO]
-    );
+    const finances = await db.find('finances', {
+      columns: 'type, amount, note',
+      filters: [
+        { key: 'chat_id', op: '=', val: chatId },
+        { key: 'created_at', op: '>=', val: startISO },
+        { key: 'created_at', op: '<=', val: endISO },
+      ],
+      orderBy: 'created_at',
+      orderDir: 'ASC',
+    });
 
     const masuk = (finances || []).filter(f => f.type === 'masuk');
     const keluar = (finances || []).filter(f => f.type === 'keluar');

@@ -136,10 +136,14 @@ async function saveTransaksi(ctx, session) {
     const todayStart = moment().tz('Asia/Jakarta').startOf('day').toISOString();
     const todayEnd = moment().tz('Asia/Jakarta').endOf('day').toISOString();
 
-    const totals = await db.raw(
-      'SELECT type, amount FROM finances WHERE chat_id = ? AND created_at >= ? AND created_at <= ?',
-      [chatId, todayStart, todayEnd]
-    );
+    const totals = await db.find('finances', {
+      columns: 'type, amount',
+      filters: [
+        { key: 'chat_id', op: '=', val: chatId },
+        { key: 'created_at', op: '>=', val: todayStart },
+        { key: 'created_at', op: '<=', val: todayEnd },
+      ],
+    });
 
     const masuk = (totals || [])
       .filter(t => t.type === 'masuk')
